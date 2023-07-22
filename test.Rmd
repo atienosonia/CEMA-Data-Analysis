@@ -1,0 +1,470 @@
+---
+title: "CEMA Data Analysis Report"
+author: Sharon Atieno
+output: html_document
+date: "2023-07-19"
+---
+# Introduction
+## Project Overview
+
+Malnutrition as defined by biomedcentral refers to a state of either under-nutrition or over-nutrition. Under nutrition occurs when there is insufficient intake of energy and nutrients to meet an individual’s needs to maintain good health, whereas over nutrition occurs when a person consumes too many calories. Good nutrition and feeding practices are vital to a child’s early growth and development especially the first two years of life. Under nutrition undermines a child’s immunity which can lead to recurring infections, impaired physical and cognitive development. Under-nutrition is a prevailing issue in developing countries . In Kenya alone UNICEF estimated that about 239,446  children suffer from moderate acute malnutrition with close to about 35,000 deaths among children with less than 5 years. Stunting has also been linked to development of non - communicable diseases and lower adult productivity later on in life. Children less than 5 years who are prone to recurrent infectious diseases such as diarrhoeal illnesses, respiratory tract infections, tuberculosis and malaria often have under-nutrition as a co-morbidity. The purpose of this analysis is to gain insights and understanding into the prevailing issue of under- malnutrition . This is to be achieved through looking into the relationship between different variables in specified county’s in Kenya over a period of time, conducting Exploratory Data Analysis and Hypothesis Testing.
+
+
+## Research Questions
+
+The following research questions are what I aim to answer from the analysis:
+
+1. Is there any correlation between diarrhea cases, stunted growth and underweight children ? 
+2. Are Urban counties such as Nairobi, Mombasa and Nakuru having the most dewormed children ?
+3. Are cases of diarrhea more common in between the months of March, April and May where we have the long rains?
+4. Are children in Urban counties more prone to diarrhea cases?
+
+## Objectives
+
+1. To assess the impact of deworming on diarrhea cases
+2. To investigate the relationship between diarrhea cases, stunted growth and underweight children
+3. To identify the time periods with the highest prevalence on diarrheal cases.
+
+## Data Understanding
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load data cleaning libraries
+
+library(tidyr)
+library(dplyr)
+
+# load library to work with date time data
+
+library(lubridate)
+
+# load libraries to load data in a table
+
+library(pacman)
+
+library(zoo)
+
+# load data visualization library 
+
+library(ggplot2)
+
+# load data input libraries
+
+library(readr)
+library(haven)
+
+# load string manipulation library
+
+library(stringr)
+
+library(knitr)
+
+# load statistical tests library
+
+library(stats)
+
+```
+
+
+```{r, echo = TRUE}
+# load data
+
+data <- read.csv("C:/Users/user/Downloads/cema_internship_task_2023.csv", header = TRUE)
+
+head(data, 5)
+
+```
+
+```{r, echo = TRUE}
+
+# data shape
+
+dim(data)
+
+# check rows
+
+nrow(data)
+
+# check columns
+
+ncol(data)
+
+# column names
+
+names(data)
+
+# descriptive statistics
+
+summary(data)
+
+```
+
+From the Data Understanding, the data set has 1410 rows with 11 columns
+
+## Data Cleaning
+
+### Structural Errors
+
+#### Fixing inconsistencies in columns 
+
+While previewing the data, I realized the columns were not in a fixed data structure, for instance, the columns were using a mixed case (sentence case) instead of having all the columns in lower cases, there was a space between column names that had more than a word to describe the information about the column.Some of the data types were incorrect. Let's go ahead and fix these !
+
+```{r, echo = TRUE}
+# convert column names to lowercase
+
+names(data) <- tolower(names(data))
+
+# replacing the space character with an underscore instead
+
+names(data) <- sub("\\.", "_", names(data))
+
+# check to see if changes have been implemented
+
+names(data)
+
+# check column data type
+
+typeof(data$period)
+
+typeof(data$total_dewormed)
+
+typeof(data$stunted_6.23.months)
+
+typeof(data$stunted_24.59.months)
+
+typeof(data$underweight_0..6.months)
+
+typeof(data$underweight_24.59.months)
+
+typeof(data$county)
+
+typeof(data$acute_malnutrition)
+
+typeof(data$stunted_0..6.months)
+
+typeof(data$diarrhoea_cases)
+
+typeof(data$underweight_6.23.months)
+
+# change underweight 6-23 and 24 - 59 columns from doubles to integers
+
+data$underweight_6.23.months <- as.integer(data$underweight_6.23.months)
+
+data$underweight_24.59.months <- as.integer(data$underweight_24.59.months)
+
+# change county column from character to categorical data
+
+data$county <- as.factor(data$county)
+
+# check data type 
+
+class(data$county)
+
+# changing period column from character to month and year 
+
+data$period <- as.yearmon(data$period, "%b-%y")
+
+# check data type
+
+class(data$period)
+
+```
+
+### Duplicates
+
+```{r, echo = TRUE}
+
+# check for duplicates
+
+anyDuplicated(data)
+
+```
+
+#### The Dataset Has No Duplicated Observations 
+
+### Missing Values
+
+```{r, echo = TRUE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+# find the location of missing values
+
+print("Position of missing values")
+which(is.na(data))
+
+# count total missing values
+
+print("Count of total missing values")
+sum(is.na(data))
+
+# get percentage missing values
+
+cat("The percentage of missing values from the dataset is", 
+    100 * sum(is.na(data))/nrow(data), "%\n")
+
+# get all observations that have missing variables
+
+filtered_data <- data %>%
+  
+  filter(!complete.cases(.))
+
+# Print the filtered data
+
+kable(filtered_data)
+
+
+```
+
+The acute malnutrition column seems to be having a lot of missing values denoted as NA. The only record we have of children under 5 years with acute malnutrition are from Bomet, Garissa, Wajir, Isiolo and Embu county. The NA brings the assumption that these might not be missing values but simply the counties having no record of children below five years who were suffering from acute malnutrition. Initially I was to fill those rows with 0 to note no cases were recorded, however this was skewing the dataset causing most records to lie on the 0 value and so instead I decided to drop these missing values.Consequently, the other three columns containing number of information about stunted growth of children below 5 years were be filed with zero. This is a time series data, so the missing values in the stunted growth columns with numbers of impaired growth in children below the age of 5 years might be because there were simply no observations done or there were no records for that period. However, I could not be sure of this , it might have been a data entry error or some data collection issue. Filling these columns with a 0 would have introduced biases into the dataset which would influence summary statistics thus leading to inaccurate or misleading results. Since there only 399 observations of missing data from all the four columns. These were dropped.
+
+## Treatment for Missing Values
+
+```{r, echo = TRUE}
+
+# drop all missing values
+
+data <- na.omit(data)
+  
+# check to see if there is any missing values
+
+sum(is.na(data))
+
+# preview the data set
+
+kable(head(data, 5))
+
+# check the shape of remaining data after dropping rows
+
+dim(data)
+
+```
+
+Great ! the data set is ready for Exploratory Data Analysis
+
+## Exploratory Data Analysis 
+### County's Records
+
+```{r echo=TRUE}
+
+children_data <- data%>%
+  select(county)%>%
+  group_by(county)%>%
+  dplyr::summarise(freq=n())
+
+ggplot(children_data, aes(x=reorder(county, freq), y=freq))+ # reorder 
+  geom_col()+
+  theme_bw()+
+  labs(x="County", y="Number of Children")+
+  coord_flip() # flip graph
+
+```
+
+#### Observation
+
+Most of the records in the data set were obtained from West Pokot, Vihiga, Turkana, Tana River, Nyeri, Narok, Nakuru, Nairobi, Mombasa, Migori, Meru, Marsabit,Mandera, Makueni, Machakos, Kwale,Kisumu, Kiambu, Kajiado, Homabay and Laikipia County 
+
+
+### Total Number of Children Dewormed by County 
+
+```{r}
+# Summarize the total number of children dewormed for each county
+
+dewormed_data <- data %>%
+  group_by(county) %>%
+  dplyr::summarise(total_dewormed = sum(total_dewormed, na.rm = TRUE))
+
+# Create a bar plot of county against total children dewormed
+
+ggplot(dewormed_data, aes(x = reorder(county, total_dewormed), y = total_dewormed)) +
+  geom_col() +
+  theme_bw() +
+  labs(x = "County", y = "Total Children Dewormed") +
+  coord_flip()
+
+```
+
+#### Observation
+
+Nairobi county had the most dewormed children 
+
+### Total Number of Diarhoea Cases by County
+
+```{r}
+# Summarize the total number of diarrhoea cases for each county
+
+diarhoea_data <- data %>%
+  group_by(county) %>%
+  dplyr::summarise(diarrhoea_cases = sum(diarrhoea_cases, na.rm = TRUE))
+
+# Create a bar plot of county against diarrhoea cases
+
+ggplot(diarhoea_data, aes(x = reorder(county, diarrhoea_cases), y = diarrhoea_cases)) +
+  geom_col() +
+  theme_bw() +
+  labs(x = "County", y = "Total Number of Diarhoea Cases") +
+  coord_flip()
+
+```
+
+#### Observations
+
+Nairobi, Turkana, Kilifi,Mandera and Nakuru county seem to be having the most diarhoea cases
+
+### Time Series Analysis of Diarhoea cases
+
+```{r}
+
+time_series_data <- data %>% 
+  select(period, diarrhoea_cases) %>%
+  group_by(period) %>%
+  mutate(diarrhoea_cases = mean(diarrhoea_cases)) %>%
+  ungroup() %>%
+  distinct()
+
+ggplot(time_series_data, aes(x = period, y = diarrhoea_cases)) +
+  geom_line() +
+  theme_bw() +
+  scale_x_yearmon(n = 6, expand = c(0.01, 0)) + 
+  theme(panel.grid = element_blank(), 
+        panel.grid.major = element_line(color = "gray", linetype = "dashed"))
+
+```
+
+#### Observation
+There is some seasonality exhibited in the line graph. If you look at the months leading to April 2021 there is a peak of diarrhea cases.This is the period we mostly have the long rains with us. The last two peaks of diarrhea cases on the graph seem also to lie between the months March - April 2023. We also witness rising diarrhea cases in the beginning of year 2023.The lowest points on the graph lie in between the months of August, October and December.
+
+### Distribution of Variables
+
+```{r}
+
+# Create the histogram for "total_dewormed"
+
+ggplot(data, aes(x = total_dewormed)) +
+  geom_histogram(binwidth = 100, fill = "black", color = "gray") +
+  theme_bw() +
+  labs(title = "Histogram of Total Dewormed",
+       x = "Total Dewormed",
+       y = "Frequency")
+
+# Create the histogram for "acute_malnutrition"
+
+ggplot(data, aes(x = acute_malnutrition)) +
+  geom_histogram(binwidth = 1, fill = "black", color = "gray") +
+  theme_bw() +
+  labs(title = "Histogram of Acute Malnutrition",
+       x = "Acute Malnutrition",
+       y = "Frequency")
+```
+
+#### Observations
+
+Total Dewormed and Acute Malnutrition are positively skewed with a concentration of values near 0 . This indicates that a majority of the observations on these columns have low values and a few extreme values on the higher end.
+
+# Hypothesis Testing
+
+Hypothesis testing is done to determine whether the results of an experiment are significant or not. For the malnutrition dataset we are working on it allows us to make statistical inferences about the relationships and differences between different variables related to malnutrion. Therefore I will go ahead and conduct Pearson Chi-squared test that shows an association between childhood diarrhea and underweight cases. Then perform another chi-square test that shows association between diarrhea and  stunted growth of children in Kenya below 5 years.
+
+### Formulation of Null Hypothesis
+
+There is no correlation between diarhea cases, underweight and stunted growth in children below the ages of 5 years.
+
+### Stating the Alpha
+
+The significance level is set at 0.05 %
+
+## Chi-Square Test of Underweight Children 
+```{r}
+# Create separate subsets based on age groups
+
+# Subset data for age group 0-6 months
+
+age_group_0_6 <- data %>%
+  filter(!is.na(underweight_0..6.months))
+
+# Subset data for age group 6-23 months
+
+age_group_6_23 <- data %>%
+  filter(!is.na(underweight_6.23.months))
+
+# Subset data for age group 24-59 months
+
+age_group_24_59 <- data %>%
+  filter(!is.na(underweight_24.59.months))
+
+# Perform chi-square tests for each subset
+
+# Perform chi-square test between underweight age group 0-6 months and diarrhea cases
+
+suppressWarnings(chi_square_0_6 <- chisq.test(table(age_group_0_6$diarrhoea_cases, age_group_0_6$underweight_0..6.months)))
+
+# Perform chi-square test between underweight age group 6-23 months and diarrhea cases
+
+suppressWarnings(chi_square_6_23 <- chisq.test(table(age_group_6_23$diarrhoea_cases, age_group_6_23$underweight_6.23.months))
+)
+# Perform chi-square test between underweight age group 24-59 months and diarrhea cases
+
+suppressWarnings(chi_square_24_59 <- chisq.test(table(age_group_24_59$diarrhoea_cases, age_group_24_59$underweight_24.59.months))
+)
+# Print the results
+print(chi_square_0_6)
+print(chi_square_6_23)
+print(chi_square_24_59)
+
+```
+
+#### Observations
+
+All the three age groups, 0-6, 6-23, and 24-59 months have a p_value of less that 0.05 % therefore we will go ahead and reject the null hypothesis. This means that there is a significant correlation between diarrhea cases and underweight children of below 5 years of age.
+
+## Chi-Square Test of Stunted Growth in Children 
+
+```{r}
+# Create separate subsets based on age groups
+
+age_group_6_23 <- data %>%
+  filter(!is.na(stunted_6.23.months))
+
+age_group_0_6 <- data %>%
+  filter(!is.na(stunted_0..6.months))
+
+age_group_24_59 <- data %>%
+  filter(!is.na(stunted_24.59.months))
+
+# Perform chi-square tests for each subset
+
+# Perform chi-square test between stunted growth age group 6-23 months and diarrhea cases
+suppressWarnings({
+  chi_square_6_23 <- chisq.test(table(age_group_6_23$diarrhoea_cases, age_group_6_23$stunted_6.23.months))
+})
+
+# Perform chi-square test between stunted growth age group 0-6 months and diarrhea cases
+
+suppressWarnings({
+  chi_square_0_6 <- chisq.test(table(age_group_0_6$diarrhoea_cases, age_group_0_6$stunted_0..6.months))
+})
+
+# Perform chi-square test between stunted growth age group 24-59 months and diarrhea cases
+suppressWarnings({
+  chi_square_24_59 <- chisq.test(table(age_group_24_59$diarrhoea_cases, age_group_24_59$stunted_24.59.months))
+})
+
+# Print the results
+print(chi_square_6_23)
+print(chi_square_0_6)
+print(chi_square_24_59)
+
+```
+
+#### Observations
+
+All the three age groups, 0-6, 6-23, and 24-59 months have a p_value of less that 0.05 % therefore we will go ahead and reject the null hypothesis. This means that there is a significant correlation between diarrhea cases and stunted growth in children of below 5 years of age.
+
+Note : while the Chi-Test confirms our assumptions on the relationship between the variables, its worth noting that more data would enable better hypothesis testing to be conducted with minimal errors thus building a strong foundation to support our claims.
+
+## Conclusion
+
+While Nairobi county registered the highest number of dewormed children, it still had the highest number of diarrhea cases. This might be attributed to presence of open garbage and presence of faeces.  Rainy seasons following dry periods are usually accompanied by heightened diarrhea cases since rain flushes pathogens into surface water that is consumed by households. We saw an increased number of diarrhea cases towards the beginning of January 2023. This can be attributed to the month generally being a dry season thus poor sanitation among households with children below the age of 5 years. There is proven data that shows that there is a great correlation between diarrhea, stunted growth and underweight children.
+
+It is not only enough to deworm children, other factors such as proper prenatal care, child feeding practices, level of education, renting, presence of flies, presence of open garbage, presence of faeces, and immunization practices of the child are greatly associated with  diarrhea prevalence and under malnutrition. 
